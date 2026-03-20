@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REACTOR CORE: ELITE COMMAND - V2.0</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Rajdhani:wght@600&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+        body, html { width: 100vw; height: 100vh; background: #020205; font-family: 'Rajdhani', sans-serif; color: #00ffff; overflow: hidden; display: flex; flex-direction: column; }
+
+        .top-banner { width: 100%; padding: 12px; background: rgba(0, 255, 255, 0.05); text-align: center; border-bottom: 1px solid #1a1a3a; font-family: 'Orbitron'; font-size: 0.75rem; letter-spacing: 4px; }
+        
+        #splash-screen, #mission-selection, #mission-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #08081a 0%, #000 100%); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        #mission-selection { display: none; z-index: 4500; }
+        .mission-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 900px; padding: 20px; }
+        .mission-card {
+            background: rgba(0, 255, 255, 0.03); border: 1px solid #00ffff55; border-radius: 15px; padding: 25px;
+            cursor: pointer; transition: 0.3s; position: relative; overflow: hidden;
+        }
+        .mission-card::before { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(45deg, transparent, rgba(0,255,255,0.1)); opacity:0; transition: 0.3s;}
+        .mission-card:hover::before { opacity: 1; }
+        .mission-card:hover { border-color: #00ffff; transform: scale(1.02); box-shadow: 0 0 20px rgba(0,255,255,0.2); }
+        .m-title { font-family: 'Orbitron'; color: #ff0080; margin-bottom: 5px; font-size: 1.2rem; text-transform: uppercase; }
+        .m-meta { font-family: 'Orbitron'; color: #00ffff; font-size: 0.8rem; letter-spacing: 1px; }
+
+        .header { width: 100%; max-width: 1400px; margin: 15px auto; display: none; padding: 0 25px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 255, 255, 0.2); padding: 12px; border-radius: 12px; text-align: center; backdrop-filter: blur(5px); }
+        .stat-label { font-size: 0.7rem; color: #ff0080; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .stat-value { font-family: 'Orbitron'; font-size: 1rem; color: #fff; text-shadow: 0 0 10px rgba(0,255,255,0.5); }
+
+        .controls-wrap { display: flex; align-items: center; justify-content: center; gap: 25px; background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 18px; border: 1px solid #1a1a3a; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .btn { font-family: 'Orbitron'; padding: 14px 28px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; letter-spacing: 2px; }
+        #chargeBtn { background: #ff0080; color: white; box-shadow: 0 0 15px rgba(255,0,128,0.4); }
+        #launchBtn { background: #151515; color: #444; border: 1px solid #333; }
+        #launchBtn.ready { background: #00ff88; color: black; box-shadow: 0 0 20px #00ff88; cursor: pointer; }
+        .power-bar { width: 300px; height: 15px; background: #000; border-radius: 10px; border: 1px solid #333; overflow: hidden; position: relative; }
+        #powerFill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff0080, #00ffff); transition: 0.1s; }
+
+        #game-box { position: relative; flex-grow: 1; width: 100%; display: none; }
+        #msg-screen { display:none; position:absolute; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+        
+        #three-d-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 6000; display: none; }
+        #three-canvas-container { width: 100%; height: 100%; cursor: grab; }
+        #model-label { position: absolute; top: 40px; width: 100%; text-align: center; font-family: 'Orbitron'; font-size: 2rem; color: #00ffff; text-transform: uppercase; letter-spacing: 10px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div class="top-banner">ARCHITECT COMMAND: ENTRANCE GRANTED</div>
+
+    <div id="splash-screen">
+        <h1 style="font-family:'Orbitron'; font-size: 4rem; margin-bottom: 20px; background: linear-gradient(90deg, #ff0080, #00ffff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;color: transparent; text-shadow: 0 0 30px rgba(0,255,255,0.3);">CORE ARCHITECT</h1>
+        <p style="letter-spacing: 5px; margin-bottom: 40px; color: #fff; opacity: 0.7;">QUANTUM PHYSICS CONSTRUCTION SIMULATOR</p>
+        <button id="start-btn" class="btn" style="background:#00ffff; color:#000; padding: 20px 50px; font-size: 1.2rem;">INITIALIZE SYSTEM</button>
+    </div>
+
+    <div id="mission-selection">
+        <h2 style="font-family:'Orbitron'; margin-bottom: 40px; color: #fff; letter-spacing: 5px;">SELECT CONSTRUCTION PROJECT</h2>
+        <div class="mission-grid" id="missionGrid"></div>
+    </div>
+
+    <div id="mission-overlay" style="display:none;">
+        <div style="background: rgba(0,255,255,0.05); border: 2px solid #00ffff; padding: 40px; border-radius: 20px; text-align: center; width: 500px; backdrop-filter: blur(10px);">
+            <h2 id="currentBuildTitle" style="font-family:'Orbitron'; color: #ff0080; margin-bottom: 10px;">STAGE 1</h2>
+            <p id="currentBuildDesc" style="color: #fff; margin-bottom: 30px; opacity: 0.8;">Initialize structural foundations.</p>
+            <button id="accept-mission" class="btn" style="background:#00ffff; color:#000; width: 100%;">START ASSEMBLY</button>
+        </div>
+    </div>
+
+    <div class="header" id="game-header">
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Project</div><div id="projName" class="stat-value">---</div></div>
+            <div class="stat-card"><div class="stat-label">Build Stage</div><div id="stageName" class="stat-value">0 / 10</div></div>
+            <div class="stat-card"><div class="stat-label">Goal</div><div id="goalCount" class="stat-value">0 Required</div></div>
+            <div class="stat-card"><div class="stat-label">Collected</div><div id="collectedRatio" class="stat-value">0 / 0</div></div>
+            <div class="stat-card"><div class="stat-label">Integrity</div><div id="built-count" class="stat-value">0%</div></div>
+        </div>
+        <div class="controls-wrap">
+            <button id="chargeBtn" class="btn">⚡ CHARGE</button>
+            <div class="power-bar"><div id="powerFill"></div></div>
+            <button id="launchBtn" class="btn">🚀 LAUNCH</button>
+        </div>
+    </div>
+
+    <div id="game-box">
+        <div id="msg-screen">
+            <h2 id="status" style="font-family:'Orbitron'; font-size:4rem; margin-bottom: 10px;">SUCCESS</h2>
+            <p id="fail-msg" style="color: white; margin-bottom: 30px; font-size: 1.2rem; display:none;">Critical Failure: Insufficient Core Energy</p>
+            <button class="btn" id="view3dBtn" style="background:#ff0080; color:#fff; margin-bottom: 15px; width: 350px;">🛰️ INSPECT BUILD</button>
+            <button class="btn" id="nextBtn" style="background:#00ff88; color:#000; width: 350px;">CONTINUE ASSEMBLY</button>
+            <button class="btn" id="retryBtn" style="background:#555; color:#fff; width: 350px; display:none;">RETRY MISSION</button>
+            <button class="btn" id="fireBtn"style="background:#ff0080;color:white;width:350px; display:none;">🎆 START FIREWORK</button>
+            <button class="btn" id="finalHomeBtn" style="background:#00ffff; color:#000; width: 350px; display:none; margin-top:10px;">NEW PROJECT</button>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="three-d-page">
+        <div id="model-label">SYSTEM INTEGRATION</div>
+        <div id="three-canvas-container"></div>
+        <button id="close3dBtn" class="btn" style="position:absolute; bottom:40px; left:50%; transform:translateX(-50%); background:#00ffff; color:#000; border: 4px solid #000;">RESUME COMMAND</button>
+    </div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+<script>
+/**
+ * ARCHITECT ENGINE V2.0 - Core Systems
+ * Matter.js: High-precision physics & magnetic fields
+ * Three.js: Procedural 3D engineering components
+ */
+
+const MissionData = {
+    missile: { 
+        id: 'missile', 
+        title: "ICBM Striker", 
+        structure: "ORBITAL MISSILE", 
+        stages: ["Engine Base", "Fuel Coupling", "Main Thrusters", "Lower Fins", "Main Fuselage", "Stage Separator", "Guidance System", "Steering Thrusters", "Warhead Mount", "Heat Nose Shield"] 
+    },
+    fusion: { 
+        id: 'fusion', 
+        title: "Quantum Reactor", 
+        structure: "TOKAMAK FUSION", 
+        stages: ["Base Support", "Cooling Pipes", "Torus Foundation", "Outer Shell", "Magnetic Coils", "Injectors", "Plasma Chamber", "Divertor", "Blanket Shield", "Vacuum Vessel"] 
+    },
+    plane: { 
+        id: 'plane', 
+        title: "Stealth Fighter", 
+        structure: "X-99 SHADOW", 
+        stages: ["Chassis Frame", "Landing Gear", "Fuselage", "Engine Intake", "Rear Fin", "Main Wings", "Under-wing Pylons", "Avionics Bay", "Cockpit Glass", "Stealth Coating"] 
+    },
+    bomb: { 
+        id: 'bomb', 
+        title: "Nuclear Core", 
+        structure: "DEEP PRESSURE UNIT", 
+        stages: ["Outer Fins", "Safety Link", "Lead Shield", "Primary Casing", "Neutron Initiator", "Reflector Layer", "Explosive Lens", "Fissile Core", "Arming Unit", "External Detonator"] 
+    }
+};
+
+let currentMission = null;
+let currentLevel = 1;       
+let completedLevels = 0;    
+let currentGoal = 0;
+let difficultyScaling = 1.0;
+
+const { Engine, Render, Runner, Bodies, Composite, Body, Events, Vector } = Matter;
+let engine, render, runner, mainBall, portal, reactors = [], obstacles = [], smallBalls = [];
+let power = 0, charging = false, collected = 0, gameActive = false, launched = false;
+
+const MissionManager = {
+    init() {
+        const grid = document.getElementById('missionGrid');
+        grid.innerHTML = '';
+        Object.values(MissionData).forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'mission-card';
+            card.innerHTML = `<div class="m-title">${m.title}</div><div class="m-meta">${m.structure}</div>`;
+            card.onclick = () => { 
+                currentMission = m; 
+                completedLevels = 0; 
+                currentLevel = 1;
+                document.getElementById('mission-selection').style.display='none'; 
+                this.loadLevelUI(); 
+            };
+            grid.appendChild(card);
+        });
+    },
+    loadLevelUI() {
+        document.getElementById('mission-overlay').style.display = 'flex';
+        const stageName = currentMission.stages[completedLevels] || "Advanced Systems";
+        document.getElementById('currentBuildTitle').innerText = `STAGE ${completedLevels + 1}: ${stageName}`;
+        document.getElementById('projName').innerText = currentMission.title;
+        document.getElementById('stageName').innerText = `${completedLevels} / 10`;
+    }
+};
+
+function initPhysics() {
+    engine = Engine.create();
+    render = Render.create({
+        canvas: document.getElementById('gameCanvas'),
+        engine: engine,
+        options: { width: window.innerWidth, height: window.innerHeight - 250, wireframes: false, background: 'transparent' }
+    });
+    Render.run(render);
+    runner = Runner.create();
+    Runner.run(runner, engine);
+    
+    Events.on(engine, 'beforeUpdate', () => {
+        const time = Date.now() * 0.002;
+        
+        // Obstacle Logic
+        obstacles.forEach(o => {
+            if(o.type === 'slider') Body.setPosition(o.body, { x: o.originX + Math.sin(time * 0.8) * o.range, y: o.body.position.y });
+            if(o.type === 'rotator') Body.rotate(o.body, o.speed);
+            if(o.type === 'barrier') Body.setPosition(o.body, { x: o.body.position.x, y: o.originY + Math.cos(time * 1.2) * 80 });
+        });
+        if(portal){
+
+        portal.render.strokeStyle =`hsl(${Date.now()*0.2 % 360},100%,60%)`;
+        }
+        // Portal Movement
+        if(currentLevel >= 7 && portal) {
+            Body.setPosition(portal, { x: (window.innerWidth - 300) + Math.sin(time * 0.5) * 250, y: portal.position.y });
+        }
+
+        // Magnetic Attraction System (Spiral Attraction)
+        if(gameActive){
+    smallBalls.forEach(b => {
+
+        const diff = Vector.sub(portal.position, b.position);
+        const dist = Vector.magnitude(diff);
+
+        if(dist < 700){
+
+            // normalized direction
+            const normal = Vector.normalise(diff);
+
+            // attraction force (toward portal)
+            const attraction = Vector.mult(normal, 0.05);
+
+            // perpendicular vector for spiral motion
+            const tangent = { x: -normal.y, y: normal.x };
+
+            // spiral force
+            const spiral = Vector.mult(tangent, 0.002);
+
+            // apply combined force
+            const totalForce = Vector.add(attraction, spiral);
+            Body.applyForce(b, b.position, totalForce);
+
+            // capture inside reactor
+            if(dist < 80){
+                collected++;
+                document.getElementById('collectedRatio').innerText =
+                    `${collected} / ${currentGoal}`;
+
+                smallBalls = smallBalls.filter(x => x !== b);
+                Composite.remove(engine.world, b);
+            }
+        }
+    });
+}
+    });
+
+    Events.on(engine, 'collisionStart', (e) => {
+        e.pairs.forEach(p => {
+            const { bodyA, bodyB } = p;
+            reactors.forEach(r => { 
+                if((bodyA === r || bodyB === r) && (bodyA === mainBall || bodyB === mainBall)) triggerBurst(r); 
+            });
+        });
+    });
+}
+
+function triggerBurst(r) {
+
+const pos = r.position;
+
+Composite.remove(engine.world, r);
+reactors = reactors.filter(x => x !== r);
+
+const fragments = 20 + Math.floor(Math.random()*10);
+
+for(let i=0;i<fragments;i++){
+
+const b = Bodies.circle(pos.x,pos.y,4 + Math.random()*4,{
+restitution:0.9,
+friction:0.01,
+render:{
+fillStyle:`hsl(${Math.random()*360},100%,60%)`,
+strokeStyle:"#ffffff",
+lineWidth:1
+}
+});
+
+const angle = Math.random()*Math.PI*2;
+const force = 15 + Math.random()*15;
+
+Body.setVelocity(b,{
+x:Math.cos(angle)*force,
+y:Math.sin(angle)*force
+});
+
+smallBalls.push(b);
+Composite.add(engine.world,b);
+
+}
+
+}
+
+function levelGenerator(lvl) {
+    const cx = window.innerWidth / 2;
+    const cy = (window.innerHeight - 250) / 2;
+
+    // Level 2+: Horizontal Obstacle
+    if(lvl >= 2) {
+        const block = Bodies.rectangle(cx - 200, cy, 300, 30, { isStatic: true, render: { fillStyle: '#1a1a3a' } });
+        Composite.add(engine.world, block);
+    }
+
+    // Level 3+: Sliders
+    if(lvl >= 3) {
+        const s = Bodies.rectangle(cx + 100, 200, 200, 20, { isStatic: true, render: { fillStyle: '#ff0080' } });
+        obstacles.push({ body: s, type: 'slider', originX: cx + 100, range: 150 });
+        Composite.add(engine.world, s);
+    }
+
+    // Level 4+: Rotating Beam
+    if(lvl >= 4) {
+        const r = Bodies.rectangle(cx, 400, 250, 25, { isStatic: true, render: { fillStyle: '#00ffff' } });
+        obstacles.push({ body: r, type: 'rotator', speed: 0.03 * difficultyScaling });
+        Composite.add(engine.world, r);
+    }
+
+    // Level 5+: Vertical Barriers
+    if(lvl >= 5) {
+        const b = Bodies.rectangle(cx + 300, 350, 30, 200, { isStatic: true, render: { fillStyle: '#555' } });
+        obstacles.push({ body: b, type: 'barrier', originY: 350 });
+        Composite.add(engine.world, b);
+    }
+
+    // Level 9: Narrow path
+    if(lvl == 9) {
+        const top = Bodies.rectangle(300, 200, 600, 40, { isStatic: true, render: { fillStyle: '#222' } });
+        const bot = Bodies.rectangle(300, 500, 600, 40, { isStatic: true, render: { fillStyle: '#222' } });
+        Composite.add(engine.world, [top, bot]);
+    }
+}
+
+function buildLevel() {
+    Composite.clear(engine.world);
+    reactors = []; smallBalls = []; obstacles = []; 
+    
+    gameActive = true; launched = false; charging = false; power = 0; collected = 0;    
+    document.getElementById('powerFill').style.width = '0%';
+    document.getElementById('launchBtn').classList.remove('ready');
+
+    currentGoal = Math.floor(
+    10 +
+    (currentLevel * 3) +
+    (completedLevels * 2) +
+    (Math.pow(currentLevel,1.4))
+    );
+    document.getElementById('goalCount').innerText = `${currentGoal} Required`;
+    document.getElementById('collectedRatio').innerText = `0 / ${currentGoal}`;
+    document.getElementById('msg-screen').style.display = 'none';
+    document.getElementById("fireBtn").style.display = "none";
+
+    // Player & World
+    mainBall = Bodies.circle(100, 150, 25, { isStatic: true, render: { fillStyle: '#fff', strokeStyle: '#00ffff', lineWidth: 5 } });
+    const ramp = Bodies.rectangle(150, 400, 350, 30, { isStatic: true, angle: 0.6, render: { fillStyle: '#ff0080' } });
+    portal = Bodies.circle(window.innerWidth - 200, 450, 120, { isStatic: true, isSensor: true, render: { fillStyle: '#00ff8805', strokeStyle: '#00ff88', lineWidth: 2 } });
+    
+    Composite.add(engine.world, [mainBall, ramp, portal, Bodies.rectangle(window.innerWidth/2, window.innerHeight, window.innerWidth, 50, {isStatic:true})]);
+    
+    levelGenerator(currentLevel);
+    
+    // Spawn Reactors
+    const count = 5 + currentLevel;
+    for(let i=0; i < count; i++) {
+        const x = 500 + Math.random() * (window.innerWidth - 850);
+        const y = 100 + Math.random() * 500;
+        const hue = Math.random()*360;
+
+    const r = Bodies.circle(x, y, 40, { isStatic: true,render: {
+        fillStyle:`hsl(${hue},70%,15%)`,
+        strokeStyle:`hsl(${hue},100%,60%)`,
+        lineWidth:3
+    }
+    });
+        
+        // Level 6+: Moving reactors
+        if(currentLevel >= 6) {
+            obstacles.push({ body: r, type: 'barrier', originY: y });
+        }
+        
+        reactors.push(r);
+    }
+    Composite.add(engine.world, reactors);
+}
+
+function spawnVictoryParticles(){
+
+for(let i=0;i<60;i++){
+
+const p = Bodies.circle(
+portal.position.x,
+portal.position.y,
+4,
+{
+render:{ fillStyle:`hsl(${Math.random()*360},100%,60%)` },
+restitution:0.9
+}
+);
+
+Body.setVelocity(p,{
+x:(Math.random()-0.5)*20,
+y:(Math.random()-0.5)*20
+});
+
+Composite.add(engine.world,p);
+
+setTimeout(()=>Composite.remove(engine.world,p),2000);
+
+}
+}
+
+let fireworkInterval = null;
+
+function startFireworks(){
+
+if(fireworkInterval) return; // prevent multiple starts
+
+fireworkInterval = setInterval(()=>{
+
+const x = Math.random()*window.innerWidth;
+const y = Math.random()*400;
+
+for(let i=0;i<40;i++){
+
+const f = Bodies.circle(x,y,3,{
+render:{fillStyle:`hsl(${Math.random()*360},100%,60%)`}
+});
+
+Body.setVelocity(f,{
+x:(Math.random()-0.5)*25,
+y:(Math.random()-0.5)*25
+});
+
+Composite.add(engine.world,f);
+
+setTimeout(()=>Composite.remove(engine.world,f),2000);
+
+}
+
+},800);
+
+}
+
+// --- OPTIMIZED SMOOTH LAUNCH LOGIC ---
+
+let isLaunching = false; // Flag to prevent shaking during Inspect Build
+
+// --- DIRECTION-AWARE LAUNCH LOGIC ---
+
+function launchRocket() {
+    if (isLaunching) return;
+    isLaunching = true;
+    
+    let speed = 0;
+    let accel = 0.008;
+    const missionId = currentMission.id;
+
+    // Disable controls during cinematic
+    if(renderer.domElement.__controls) renderer.domElement.__controls.enabled = false;
+
+    const liftOff = () => {
+        if (!isLaunching) return;
+
+        speed += accel;
+
+        // Direction logic based on mission type
+        if (missionId === 'plane') {
+            // X-99 Shadow flies to the RIGHT
+            stationGroup.position.x += speed;
+            // Stop if it leaves the screen horizontally
+            if (stationGroup.position.x > 80) isLaunching = false;
+        } else {
+            // Missile, Fusion, and Bomb fly UPWARD
+            stationGroup.position.y += speed;
+            // Stop if it leaves the screen vertically
+            if (stationGroup.position.y > 80) isLaunching = false;
+        }
+
+        // Camera Shake
+        camera.position.x += (Math.random() - 0.5) * 0.2;
+        camera.position.y += (Math.random() - 0.5) * 0.2;
+
+        rocketSmoke(); // Smoke also needs to respect direction
+        
+        if (isLaunching) {
+            requestAnimationFrame(liftOff);
+        } else {
+            // Reset for next time
+            if(renderer.domElement.__controls) renderer.domElement.__controls.enabled = true;
+        }
+    };
+    liftOff();
+}
+
+function rocketSmoke() {
+    const missionId = currentMission.id;
+    
+    for (let i = 0; i < 2; i++) {
+        const smoke = new THREE.Mesh(
+            new THREE.SphereGeometry(0.4, 8, 8),
+            new THREE.MeshBasicMaterial({color: 0x666666, transparent: true, opacity: 0.5})
+        );
+
+        // Position smoke BEHIND the engine
+        if (missionId === 'plane') {
+            // Spawn smoke to the LEFT of the plane as it moves right
+            smoke.position.set(stationGroup.position.x - 6, stationGroup.position.y, stationGroup.position.z);
+        } else {
+            // Spawn smoke BELOW the rocket as it moves up
+            smoke.position.set(stationGroup.position.x, stationGroup.position.y - 5, stationGroup.position.z);
+        }
+        
+        scene.add(smoke);
+
+        const fade = () => {
+            smoke.material.opacity -= 0.015;
+            smoke.scale.multiplyScalar(1.02);
+            
+            // Smoke drifts slightly opposite to movement
+            if (missionId === 'plane') smoke.position.x -= 0.05;
+            else smoke.position.y -= 0.05;
+
+            if (smoke.material.opacity > 0) requestAnimationFrame(fade);
+            else { scene.remove(smoke); smoke.geometry.dispose(); smoke.material.dispose(); }
+        };
+        fade();
+    }
+}
+
+
+function checkEnd() {
+    gameActive = false;
+    const win = collected >= currentGoal;
+    const screen = document.getElementById('msg-screen');
+    const status = document.getElementById('status');
+    const failMsg = document.getElementById('fail-msg');
+    
+    screen.style.display = 'flex';
+    
+    if(win) {
+        status.innerText = "MISSION SUCCESS"; status.style.color = "#00ff88";
+        failMsg.style.display = 'none';
+        document.getElementById('nextBtn').style.display = 'block';
+        document.getElementById('retryBtn').style.display = 'none';
+        spawnVictoryParticles();
+        completedLevels++;
+        document.getElementById('built-count').innerText = (completedLevels * 10) + "%";
+        Architect3D.render();
+
+       if (completedLevels >= 10) {
+
+        status.innerText = "🚀 PROJECT COMPLETE 🚀";
+
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('finalHomeBtn').style.display = 'block';
+        if(currentMission.id === 'missile'){
+            document.getElementById('fireBtn').style.display = 'block';
+        }
+        
+
+        }
+    } else {
+        status.innerText = "MISSION FAILED"; status.style.color = "#ff0080";
+        failMsg.style.display = 'block';
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('retryBtn').style.display = 'block';
+    }
+}
+
+/** THREE.JS CONSTRUCTION ENGINE **/
+let scene, camera, renderer, stationGroup;
+
+function init3D() {
+    scene = new THREE.Scene();
+    // SPACE STARS
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 2000;
+
+    const starVertices = [];
+
+    for(let i=0;i<starCount;i++){
+
+        const x = (Math.random()-0.5)*2000;
+        const y = (Math.random()-0.5)*2000;
+        const z = (Math.random()-0.5)*2000;
+
+        starVertices.push(x,y,z);
+    }
+
+    starGeo.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(starVertices,3)
+    );
+
+const starMat = new THREE.PointsMaterial({
+color:0xffffff,
+size:1
+});
+
+const stars = new THREE.Points(starGeo,starMat);
+scene.add(stars);
+
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('three-canvas-container').appendChild(renderer.domElement);
+    
+    scene.add(new THREE.AmbientLight(0x404040, 2));
+    const light = new THREE.DirectionalLight(0x00ffff, 2);
+    light.position.set(5, 5, 5);
+    scene.add(light);
+    
+    stationGroup = new THREE.Group();
+    scene.add(stationGroup);
+    camera.position.set(0, 0, 25);
+    camera.lookAt(0, 0, 0);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enableZoom = false;
+controls.enablePan = false;
+renderer.domElement.__controls = controls;
+
+    let isDragging = false;
+    let previousMouseX= 0;
+    const container = document.getElementById('three-canvas-container');
+    container.addEventListener('mousedown', (e) => { isDragging = true; previousMouseX = e.clientX; });
+    window.addEventListener('mouseup', () => isDragging = false);
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return; 
+
+        const deltaX = e.clientX - previousMouseX;
+
+            stationGroup.rotation.y += deltaX * 0.02;
+            previousMouseX = e.clientX;
+        
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if(!isDragging) stationGroup.rotation.y += 0.005;
+        renderer.render(scene, camera);
+        controls.update();
+    }
+    animate();
+}
+
+const Architect3D = {
+    render() {
+        while(stationGroup.children.length > 0) stationGroup.remove(stationGroup.children[0]);
+        const stage = completedLevels; 
+        const bodyMat = new THREE.MeshStandardMaterial({color:0xffffff,metalness:0.8,roughness:0.3});
+        const material = bodyMat;
+        const finMat = new THREE.MeshStandardMaterial({color:0x111111,metalness:0.6,roughness:0.4});
+        const noseMat = new THREE.MeshStandardMaterial({color:0xffffff,metalness:0.9});
+        const coreMat = new THREE.MeshStandardMaterial({color:0xff0080,emissive:0xff0080,emissiveIntensity:3,metalness:0.5});
+    
+    if (currentMission.id === 'missile') {
+
+    // Stage 1 - Engine Base
+    if(stage >= 1){
+        const engine = new THREE.Mesh(
+            new THREE.CylinderGeometry(2.2,2.4,1.5,32),
+            bodyMat
+        );
+        engine.position.y = 0;
+        stationGroup.add(engine);
+    }
+
+    // Stage 2 - Lower Body
+    if(stage >= 2){
+        const body1 = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.9,2.1,3,32),
+            bodyMat
+        );
+        body1.position.y = 2.25;
+        stationGroup.add(body1);
+    }
+
+    // Stage 3 - Main Body
+    if(stage >= 3){
+        const body2 = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.7,1.9,4,32),
+            bodyMat
+        );
+        body2.position.y = 5.5;
+        stationGroup.add(body2);
+    }
+
+    
+
+    // Stage 4 - REAL SIDE ATTACHED TRIANGULAR FINS
+if (stage >= 4) {
+    // 1. Create a realistic swept-back wing shape
+    const finShape = new THREE.Shape();
+    finShape.moveTo(0, 0);           // Bottom Inner
+    finShape.lineTo(2.2, -1.5);      // Bottom Outer (swept back)
+    finShape.lineTo(2.2, 0.5);       // Top Outer
+    finShape.lineTo(0, 1.5);         // Top Inner
+    finShape.lineTo(0, 0);           // Close shape
+
+    const extrudeSettings = {
+        depth: 0.1,
+        bevelEnabled: true,
+        bevelThickness: 0.05,
+        bevelSize: 0.05,
+        bevelSegments: 2
+    };
+
+    const finGeo = new THREE.ExtrudeGeometry(finShape, extrudeSettings);
+    // Center the geometry on its Z-axis so it rotates around its middle thickness
+    finGeo.center(); 
+
+    // 2. Use a loop for perfect radial symmetry
+    const numFins = 4;
+    const rocketRadius = 1.7; // Matches your Stage 3 body radius
+
+    for (let i = 0; i < numFins; i++) {
+        const fin = new THREE.Mesh(finGeo, material);
+        
+        // Calculate angle for each fin (0, 90, 180, 270 degrees)
+        const angle = (i / numFins) * Math.PI * 2;
+        
+        // Position the fin root against the rocket surface
+        // We add half the fin width (1.1) to the rocket radius
+        const distance = rocketRadius + 1.1; 
+        fin.position.x = Math.cos(angle) * distance;
+        fin.position.z = Math.sin(angle) * distance;
+        fin.position.y = -0.5; // Adjusted to sit near the engine base
+
+        // Rotate the fin to point outward from the center
+        fin.rotation.y = -angle + Math.PI / 2;
+        
+        stationGroup.add(fin);
+    }
+}
+
+    // Stage 4 - Upper Body
+    if(stage >= 5){
+        const body3 = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.5,1.7,3,32),
+            bodyMat
+        );
+        body3.position.y = 8.75;
+        stationGroup.add(body3);
+    }
+
+    // Stage 6 - Guidance Section
+    if(stage >= 6){
+        const guide = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.6,1.9,4,32),
+            bodyMat
+        );
+        guide.position.y = 11.5;
+        stationGroup.add(guide);
+    }
+
+    // Stage 7 - Upper Fuel Module
+    if(stage >= 7){
+        const upperFuel = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.3,1.6,3,32),
+            bodyMat
+        );
+        upperFuel.position.y = 13.75;
+        stationGroup.add(upperFuel);
+    }
+
+    // Stage 8 - Tip Connector
+    if(stage >= 8){
+        const connector = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.1,1.3,2.5,32),
+            bodyMat
+        );
+        connector.position.y = 15.5;
+        stationGroup.add(connector);
+    }
+
+    // Stage 9 - Stabilizer Ring
+    if(stage >= 9){
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(1.3,0.15,16,60),
+            bodyMat
+        );
+        ring.rotation.x = Math.PI/2;
+        ring.position.y = 1;
+        stationGroup.add(ring);
+    }
+
+    // Stage 10 - Nose Cone
+    if(stage >= 10){
+
+        const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(1.2,3,32),
+            noseMat
+        );
+        nose.position.y = 17.5;
+        stationGroup.add(nose);
+
+        // Engine Flame
+        const flame = new THREE.Mesh(
+            new THREE.ConeGeometry(0.8,3,20),
+            new THREE.MeshBasicMaterial({color:0xff6600})
+        );
+
+        flame.position.y = -2;
+        flame.rotation.x = Math.PI;
+        stationGroup.add(flame);
+
+        // Rocket Launch Animation
+        
+    }
+
+}
+
+
+        else if (currentMission.id === 'fusion') {
+
+    // Stage 1 – Base platform
+    if(stage >= 1){
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(6,6,0.5,32),
+            material
+        );
+        base.position.y = -1;
+        stationGroup.add(base);
+    }
+
+    // Stage 2 – Support ring
+    if(stage >= 2){
+        const ring1 = new THREE.Mesh(
+            new THREE.TorusGeometry(4.5,0.2,16,100),
+            material
+        );
+        ring1.rotation.x = Math.PI/2;
+        ring1.position.y = -0.5;
+        stationGroup.add(ring1);
+    }
+
+    // Stage 3 – Lower magnetic coils
+    if(stage >= 3){
+        const coil = new THREE.Mesh(
+            new THREE.TorusGeometry(4.5,0.5,16,100),
+            material
+        );
+        coil.rotation.x = Math.PI/2;
+        stationGroup.add(coil);
+    }
+
+    // Stage 4 – Reactor supports
+    if(stage >= 4){
+        for(let i=0;i<6;i++){
+            const pillar = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3,0.3,4,12),
+                material
+            );
+            pillar.position.x = Math.cos(i*Math.PI/3)*4.5;
+            pillar.position.z = Math.sin(i*Math.PI/3)*4.5;
+            stationGroup.add(pillar);
+        }
+    }
+
+    // Stage 5 – Upper torus ring
+    if(stage >= 5){
+        const ring2 = new THREE.Mesh(
+            new THREE.TorusGeometry(4.5,0.3,16,100),
+            material
+        );
+        ring2.rotation.x = Math.PI/2;
+        ring2.position.y = 1.5;
+        stationGroup.add(ring2);
+    }
+
+    // Stage 6 – Cooling pipes
+    if(stage >= 6){
+        for(let i=0;i<4;i++){
+            const pipe = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2,0.2,5,12),
+                material
+            );
+            pipe.rotation.z = Math.PI/2;
+            pipe.position.y = 0.5;
+            pipe.position.x = (i-1.5)*2;
+            stationGroup.add(pipe);
+        }
+    }
+
+    // Stage 7 – Plasma chamber
+    if(stage >= 7){
+        const chamber = new THREE.Mesh(
+            new THREE.TorusGeometry(4.5,1.8,16,100),
+            material
+        );
+        stationGroup.add(chamber);
+    }
+
+    // Stage 8 – Outer containment ring
+    if(stage >= 8){
+        const outer = new THREE.Mesh(
+            new THREE.TorusGeometry(6,0.2,16,100),
+            material
+        );
+        outer.rotation.x = Math.PI/2;
+        stationGroup.add(outer);
+    }
+
+    // Stage 9 – Energy stabilizers
+    if(stage >= 9){
+        for(let i=0;i<3;i++){
+            const stabilizer = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5,4,0.5),
+                material
+            );
+            stabilizer.position.x = (i-1)*4;
+            stabilizer.position.y = 2;
+            stationGroup.add(stabilizer);
+        }
+    }
+
+    // Stage 10 – Fusion core
+    if(stage >= 10){
+        const core = new THREE.Mesh(
+            new THREE.SphereGeometry(1.5,32,32),
+            coreMat
+        );
+        stationGroup.add(core);
+    }
+}
+        else if (currentMission.id === 'plane') {
+
+    // Stage 1 – Center fuselage
+    if(stage >= 1){
+        const fuselage = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.6,0.8,6,12),
+            material
+        );
+        fuselage.rotation.z = Math.PI/2;
+        stationGroup.add(fuselage);
+    }
+
+    // Stage 2 – Nose cone
+    if(stage >= 2){
+        const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(0.6,2,16),
+            material
+        );
+        nose.rotation.z = Math.PI/2;
+        nose.position.x = 2.5;
+        stationGroup.add(nose);
+    }
+
+    // Stage 3 – Main wings
+    if(stage >= 3){
+        const wing = new THREE.Mesh(
+            new THREE.BoxGeometry(6,0.2,14),
+            material
+        );
+        wing.position.x = 0;
+        stationGroup.add(wing);
+    }
+
+    // Stage 4 – Tail stabilizers
+    if(stage >= 4){
+        for(let i=0;i<2;i++){
+            const tail = new THREE.Mesh(
+                new THREE.BoxGeometry(1,3,0.2),
+                material
+            );
+            tail.position.set(-3.5,1,(i===0?2:-2));
+            stationGroup.add(tail);
+        }
+    }
+
+    // Stage 5 – Rear wings
+    if(stage >= 5){
+        const rearWing = new THREE.Mesh(
+            new THREE.BoxGeometry(3,0.2,8),
+            material
+        );
+        rearWing.position.x = -1.5;
+        stationGroup.add(rearWing);
+    }
+
+    // Stage 6 – Engine housing
+    if(stage >= 6){
+        const engine = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.7,0.7,2,16),
+            material
+        );
+        engine.rotation.z = Math.PI/2;
+        engine.position.x = -2.5;
+        stationGroup.add(engine);
+    }
+
+    // Stage 7 – Twin engines
+    if(stage >= 7){
+        for(let i=0;i<2;i++){
+            const eng = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.4,0.4,2,16),
+                material
+            );
+            eng.rotation.z = Math.PI/2;
+            eng.position.set(-3,0,(i===0?1.5:-1.5));
+            stationGroup.add(eng);
+        }
+    }
+
+    // Stage 8 – Cockpit base
+    if(stage >= 8){
+        const cockpit = new THREE.Mesh(
+            new THREE.SphereGeometry(0.7,16,16),
+            material
+        );
+        cockpit.position.set(1.2,0.6,0);
+        stationGroup.add(cockpit);
+    }
+
+    // Stage 9 – Vertical stabilizer
+    if(stage >= 9){
+        const fin = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2,2,2),
+            material
+        );
+        fin.position.set(-1.5,1.5,0);
+        stationGroup.add(fin);
+    }
+
+    // Stage 10 – Glass cockpit
+    if(stage >= 10){
+        const glass = new THREE.Mesh(
+            new THREE.SphereGeometry(0.5,16,16),
+            coreMat
+        );
+        glass.position.set(1.2,0.9,0);
+        stationGroup.add(glass);
+    }
+
+}
+else if (currentMission.id === 'bomb') {
+
+    // Stage 1 – Outer base
+    if(stage >= 1){
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(4,4,1,32),
+            material
+        );
+        stationGroup.add(base);
+    }
+
+    // Stage 2 – Shield layer
+    if(stage >= 2){
+        const shield = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.5,3.5,1.2,32),
+            material
+        );
+        shield.position.y = 0.5;
+        stationGroup.add(shield);
+    }
+
+    // Stage 3 – Structural frame
+    if(stage >= 3){
+        for(let i=0;i<6;i++){
+            const pillar = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3,0.3,4,12),
+                material
+            );
+            pillar.position.x = Math.cos(i*Math.PI/3)*3.5;
+            pillar.position.z = Math.sin(i*Math.PI/3)*3.5;
+            stationGroup.add(pillar);
+        }
+    }
+
+    // Stage 4 – Containment ring
+    if(stage >= 4){
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(3.5,0.3,16,100),
+            material
+        );
+        ring.rotation.x = Math.PI/2;
+        stationGroup.add(ring);
+    }
+
+    // Stage 5 – Inner casing
+    if(stage >= 5){
+        const casing = new THREE.Mesh(
+            new THREE.CylinderGeometry(2.5,2.5,2,32),
+            material
+        );
+        stationGroup.add(casing);
+    }
+
+    // Stage 6 – Stabilizer bars
+    if(stage >= 6){
+        for(let i=0;i<4;i++){
+            const bar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3,4,0.3),
+                material
+            );
+            bar.position.x = (i-1.5)*2;
+            stationGroup.add(bar);
+        }
+    }
+
+    // Stage 7 – Inner containment ring
+    if(stage >= 7){
+        const ring2 = new THREE.Mesh(
+            new THREE.TorusGeometry(2.5,0.2,16,100),
+            material
+        );
+        ring2.rotation.x = Math.PI/2;
+        stationGroup.add(ring2);
+    }
+
+    // Stage 8 – Reactor cage
+    if(stage >= 8){
+        const cage = new THREE.Mesh(
+            new THREE.SphereGeometry(2.2,16,16),
+            material
+        );
+        stationGroup.add(cage);
+    }
+
+    // Stage 9 – Energy stabilizers
+    if(stage >= 9){
+        for(let i=0;i<3;i++){
+            const stabilizer = new THREE.Mesh(
+                new THREE.BoxGeometry(0.4,3,0.4),
+                material
+            );
+            stabilizer.position.x = (i-1)*3;
+            stabilizer.position.y = 1.5;
+            stationGroup.add(stabilizer);
+        }
+    }
+
+    // Stage 10 – Nuclear core
+    if(stage >= 10){
+        const core = new THREE.Mesh(
+            new THREE.SphereGeometry(1.2,32,32),
+            coreMat
+        );
+        stationGroup.add(core);
+    }
+
+}
+        const box = new THREE.Box3().setFromObject(stationGroup);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        stationGroup.position.set(-center.x, -center.y, -center.z);
+        stationGroup.position.y -= size.y * 0.6;
+    }
+    
+};
+
+/** CONTROLS & INITIALIZATION **/
+document.getElementById('start-btn').onclick = () => { 
+    document.getElementById('splash-screen').style.display='none'; 
+    document.getElementById('mission-selection').style.display='flex'; 
+    MissionManager.init(); 
+};
+
+document.getElementById('accept-mission').onclick = () => { 
+    document.getElementById('mission-overlay').style.display='none'; 
+    document.getElementById('game-header').style.display='block'; 
+    document.getElementById('game-box').style.display='block'; 
+    if(!engine){ initPhysics(); init3D(); } 
+    buildLevel(); 
+};
+
+document.getElementById('view3dBtn').onclick = () => { 
+    isLaunching = false; // Ensure shake is OFF
+    document.getElementById('three-d-page').style.display = 'block';
+    
+    // Reset positions so it's centered for inspection
+    camera.position.set(0, 0, 20);
+    camera.lookAt(0, 0, 0);
+
+    Architect3D.render(); 
+    document.getElementById('model-label').innerText = currentMission.structure; 
+};
+
+document.getElementById('close3dBtn').onclick = () => document.getElementById('three-d-page').style.display='none';
+
+document.getElementById('nextBtn').onclick = () => { 
+    currentLevel++; 
+    MissionManager.loadLevelUI(); 
+    buildLevel();
+};
+
+document.getElementById('retryBtn').onclick = () => buildLevel();
+
+document.getElementById('finalHomeBtn').onclick = () => {
+    difficultyScaling += 0.2;
+    document.getElementById('game-header').style.display='none';
+    document.getElementById('game-box').style.display='none';
+    document.getElementById('mission-selection').style.display='flex';
+    document.getElementById('finalHomeBtn').style.display='none';
+    MissionManager.init();
+};
+document.getElementById("fireBtn").onclick = () => {
+    document.getElementById('three-d-page').style.display = 'block';
+    
+    // Reset position for launch start
+    stationGroup.position.set(0, -6, 0);
+    
+    Architect3D.render();
+    startFireworks();   
+    setTimeout(launchRocket, 500); 
+};
+
+const cb = document.getElementById('chargeBtn'), lb = document.getElementById('launchBtn');
+cb.onmousedown = () => { if(gameActive && !launched) charging = true; };
+window.onmouseup = () => charging = false;
+
+setInterval(() => { 
+    if(charging && power < 100) { 
+        power += 2.0; 
+        document.getElementById('powerFill').style.width = power + '%'; 
+        if(power > 10) lb.classList.add('ready'); 
+    } 
+}, 30);
+
+lb.onclick = () => { 
+    if(!lb.classList.contains('ready') || launched) return; 
+    launched = true; 
+    Body.setStatic(mainBall, false); 
+    Body.setVelocity(mainBall, { x: (power/3.5) + 5, y: -8 }); 
+    setTimeout(checkEnd, 8000); 
+};
+
+window.addEventListener('resize', () => {
+    if(render) {
+        render.canvas.width = window.innerWidth;
+        render.canvas.height = window.innerHeight - 250;
+    }
+});
+</script>
+</body>
+</html>
